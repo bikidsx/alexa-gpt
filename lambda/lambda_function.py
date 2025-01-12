@@ -8,7 +8,7 @@ import requests
 import logging
 import json
 
-# Set your OpenAI API key
+# Set your API key
 api_key = "YOUR_API_KEY"
 
 logger = logging.getLogger(__name__)
@@ -97,27 +97,29 @@ class CancelOrStopIntentHandler(AbstractRequestHandler):
 def generate_gpt_response(chat_history, new_question):
     """Generates a GPT response to a new question"""
     headers = {
-        "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json"
     }
-    url = "https://api.openai.com/v1/chat/completions"
-    messages = [{"role": "system", "content": "You are a helpful assistant. Answer in 50 words or less."}]
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key={api_key}"
+    contents = [{"role": "user", "parts": [{"text": new_question}]}]
     for question, answer in chat_history[-10:]:
-        messages.append({"role": "user", "content": question})
-        messages.append({"role": "assistant", "content": answer})
-    messages.append({"role": "user", "content": new_question})
+        contents.insert(0, {"role": "assistant", "parts": [{"text": answer}]})
+        contents.insert(0, {"role": "user", "parts": [{"text": question}]})
     
     data = {
-        "model": "gpt-4o-mini",
-        "messages": messages,
-        "max_tokens": 300,
-        "temperature": 0.5
+        "contents": contents,
+        "generationConfig": {
+            "temperature": 1,
+            "topK": 40,
+            "topP": 0.95,
+            "maxOutputTokens": 8192,
+            "responseMimeType": "text/plain"
+        }
     }
     try:
         response = requests.post(url, headers=headers, data=json.dumps(data))
         response_data = response.json()
         if response.ok:
-            return response_data['choices'][0]['message']['content']
+            return response_data['contents'][0]['parts'][0]['text']
         else:
             return f"Error {response.status_code}: {response_data['error']['message']}"
     except Exception as e:
